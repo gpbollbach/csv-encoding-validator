@@ -270,6 +270,93 @@ pwsh -File src/Test-AndFixCsvEncoding.ps1 [-InputDir <Pfad>] [-OutputDir <Pfad>]
 Es werden nur Dateien mit der Endung `.csv` (case-insensitiv, nicht rekursiv)
 verarbeitet. Fehlende Ausgabe-/Invalid-Verzeichnisse werden automatisch angelegt.
 
+## Windows: Produktiver Betrieb ohne Docker
+
+Das Tool ist ein reines PowerShell-Skript — Docker ist nur eine Option für den
+isolierten Lauf. Unter Windows kann es direkt mit dem **nativ installierten
+PowerShell** produktiv betrieben werden (z. B. über den Task Scheduler), ganz
+ohne Container.
+
+**Voraussetzungen**
+
+- Windows 10/11 — enthält **Windows PowerShell 5.1** (`powershell.exe`) bereits nativ.
+- Empfohlen: **PowerShell 7** (`pwsh`) — identische Laufzeit wie der Docker-Container
+  und die getestete Umgebung:
+
+  ```powershell
+  winget install --id Microsoft.PowerShell --source winget
+  ```
+
+  PowerShell 7 wird für die Produktion empfohlen. Mit Windows PowerShell 5.1
+  läuft das Skript grundsätzlich ebenfalls (Hinweis zur Skript-Kodierung unten).
+
+**1. Deployment-Ordner anlegen**
+
+```text
+C:\Tools\CsvEncodingValidator\
+├── src\Test-AndFixCsvEncoding.ps1
+├── data\input\      ← CSV-Dateien ablegen
+├── data\output\
+└── data\invalid\
+```
+
+Einfachste Variante — Repo klonen (die `data\`-Ordner sind im Repo enthalten):
+
+```bat
+git clone https://github.com/gpbollbach/csv-encoding-validator.git C:\Tools\CsvEncodingValidator
+```
+
+**2. Manueller Testlauf**
+
+```bat
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Tools\CsvEncodingValidator\src\Test-AndFixCsvEncoding.ps1" -InputDir "C:\Tools\CsvEncodingValidator\data\input" -OutputDir "C:\Tools\CsvEncodingValidator\data\output" -InvalidDir "C:\Tools\CsvEncodingValidator\data\invalid"
+echo Exit-Code: %ERRORLEVEL%
+```
+
+Mit PowerShell 7 entsprechend über `pwsh.exe -NoProfile -File …` (dort ist
+`-ExecutionPolicy` nicht nötig).
+
+**3. Produktiver Dauerbetrieb (Task Scheduler)**
+
+Wrapper-Datei `C:\Tools\CsvEncodingValidator\run-validator.cmd`:
+
+```bat
+@echo off
+setlocal
+set "BASE=C:\Tools\CsvEncodingValidator"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%BASE%\src\Test-AndFixCsvEncoding.ps1" ^
+  -InputDir "%BASE%\data\input" ^
+  -OutputDir "%BASE%\data\output" ^
+  -InvalidDir "%BASE%\data\invalid" ^
+  -Move >> "%BASE%\validator.log" 2>&1
+exit /b %ERRORLEVEL%
+```
+
+- `-Move` sorgt dafür, dass verarbeitete Dateien den Eingangsordner verlassen
+  (keine Doppelverarbeitung). Ohne `-Move` ist der Lauf idempotent — Dateien
+  bleiben im Eingang und werden bei jedem Lauf erneut (identisch) verarbeitet.
+- Der Exit-Code des Skripts (`0` = ok, `1` = unlösbare Fehler) wird über
+  `%ERRORLEVEL%` nach außen gereicht und in die Logdatei umgeleitet.
+
+Task anlegen (täglich 06:00 Uhr):
+
+```bat
+schtasks /Create /TN "CsvEncodingValidator" /TR "C:\Tools\CsvEncodingValidator\run-validator.cmd" /SC DAILY /ST 06:00
+```
+
+Das „Letzte Ergebnis" des Tasks ist dann `0` (Erfolg) oder `1` (unlösbare
+Fehler — Dateien liegen in `data\invalid`). Alternativ per GUI:
+Aufgabenplanung → *Aufgabe erstellen* → Programm `run-validator.cmd`.
+
+**Hinweis zur Skript-Kodierung**
+
+Die `.ps1` ist als UTF-8 ohne BOM abgelegt. PowerShell 7 liest das korrekt.
+Windows PowerShell 5.1 interpretiert `.ps1` ohne BOM als ANSI — dann werden
+Umlaute in Log-Meldungen falsch dargestellt. Für den Betrieb mit 5.1 die Datei
+einmalig als *UTF-8 mit BOM* speichern (z. B. VS Code → Speichern unter →
+*Encoding: UTF-8 with BOM*). Die Encoding-Erkennung/-Konvertierung des Tools
+arbeitet byte-genau und ist von der Kodierung der Skriptdatei unabhängig.
+
 ## Tests
 
 Die Test-Suite führt das Skript in vier Phasen gegen die Fixtures aus
