@@ -1,7 +1,19 @@
+# CSV Encoding Validator & Converter
+# Einmal-Lauf: verarbeitet ./data/input und beendet sich (kein Restart).
+# Exit-Code des Containers: 0 = alle Dateien valide/konvertiert, 1 = unlösbare Fehler.
+#
+# Aufruf (Exit-Code wird sauber durchgereicht):
+#   docker compose run --rm csv-encoding-validator
+#
+# Oder als Einmal-Job:
+#   docker compose up --build
 services:
   csv-encoding-validator:
     build: .
+    image: csv-encoding-validator:latest
+    container_name: csv-encoding-validator
     volumes:
       - ./data/input:/app/data/input
       - ./data/output:/app/data/output
       - ./data/invalid:/app/data/invalid
+    restart: "no"

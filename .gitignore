@@ -1,3 +1,17 @@
-.commandcode/
-data/
+# macOS
 .DS_Store
+
+# Agent-/Tool-Artefakte
+.commandcode/
+
+# Laufzeit-Verzeichnisse (Volume-Mounts) – nur Struktur per .gitkeep versionieren
+data/*
+!data/*/
+!data/*/.gitkeep
+
+# Lokale Docker-/Build-Artefakte
+.docker-config/
+.screenshot-venv/
+.chrome-profile*/
+.ql-out/
+.tmp-screenshot.html
