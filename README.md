@@ -115,6 +115,140 @@ echo "Exit-Code: $?"
 
 Parameter können direkt angehängt werden (werden an das Skript durchgereicht):
 
+Der Container verarbeitet alle Dateien mit der Endung `.csv`, schreibt erfolgreiche Ergebnisse nach `data/output` und verschiebt irreparable Dateien nach `data/invalid`. Erfolgreiche Eingabedateien bleiben als Original im Eingangsverzeichnis erhalten.
+
+## Produktiver Betrieb unter Windows ohne Docker
+
+Das Skript kann unter Windows direkt mit PowerShell 7 ausgeführt werden. Windows PowerShell 5.1 ist nicht das Zielsystem; verwende die aktuelle plattformübergreifende PowerShell-7-Version (`pwsh.exe`). Für den produktiven Betrieb sollte das Skript aus einem festen, schreibgeschützten Deployment-Verzeichnis laufen, während die Datenverzeichnisse getrennt und zugriffsbeschränkt sind.
+
+### 1. PowerShell 7 installieren
+
+PowerShell 7 kann mit dem offiziellen Installer oder mit `winget` installiert werden:
+
+```powershell
+winget install --id Microsoft.PowerShell --source winget
+pwsh --version
+```
+
+Installationspfad der üblichen 64-Bit-Installation:
+
+```text
+C:\Program Files\PowerShell\7\pwsh.exe
+```
+
+### 2. Anwendung und Datenverzeichnisse anlegen
+
+Beispiel für eine produktive Ablage:
+
+```powershell
+New-Item -ItemType Directory -Force -Path `
+  C:\CsvEncodingValidator\app, `
+  C:\CsvEncodingValidator\data\input, `
+  C:\CsvEncodingValidator\data\output, `
+  C:\CsvEncodingValidator\data\invalid, `
+  C:\CsvEncodingValidator\logs
+
+Copy-Item .\src\Test-AndFixCsvEncoding.ps1 C:\CsvEncodingValidator\app\
+```
+
+Lege die zu verarbeitenden CSV-Dateien ausschließlich in `C:\CsvEncodingValidator\data\input` ab. Erfolgreiche Ergebnisse erscheinen in `data\output`; nicht sicher reparierbare Dateien werden nach `data\invalid` verschoben.
+
+### 3. Manueller produktiver Lauf
+
+PowerShell 7 verwendet unter Windows normale Windows-Pfade für die Parameter:
+
+```powershell
+$pwsh = 'C:\Program Files\PowerShell\7\pwsh.exe'
+$script = 'C:\CsvEncodingValidator\app\Test-AndFixCsvEncoding.ps1'
+
+& $pwsh -NoLogo -NoProfile -File $script `
+  -InputDirectory 'C:\CsvEncodingValidator\data\input' `
+  -OutputDirectory 'C:\CsvEncodingValidator\data\output' `
+  -InvalidDirectory 'C:\CsvEncodingValidator\data\invalid'
+
+$exitCode = $LASTEXITCODE
+Write-Host "CSV validator exit code: $exitCode"
+exit $exitCode
+```
+
+Exit-Code `0` bedeutet, dass alle Dateien erfolgreich verarbeitet wurden. Bei Exit-Code `1` muss `data\invalid` geprüft werden.
+
+### 4. Automatisierung mit der Windows-Aufgabenplanung
+
+Für einen wiederkehrenden Batch-Lauf kann die Aufgabe beispielsweise alle fünf Minuten unter einem dedizierten Dienstkonto ausgeführt werden. Erstelle zuerst eine Wrapper-Datei `C:\CsvEncodingValidator\run-validator.ps1`:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$logDirectory = 'C:\CsvEncodingValidator\logs'
+New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$logFile = Join-Path $logDirectory "validator-$timestamp.log"
+$pwsh = 'C:\Program Files\PowerShell\7\pwsh.exe'
+$script = 'C:\CsvEncodingValidator\app\Test-AndFixCsvEncoding.ps1'
+
+& $pwsh -NoLogo -NoProfile -File $script `
+  -InputDirectory 'C:\CsvEncodingValidator\data\input' `
+  -OutputDirectory 'C:\CsvEncodingValidator\data\output' `
+  -InvalidDirectory 'C:\CsvEncodingValidator\data\invalid' *>&1 |
+  Tee-Object -FilePath $logFile
+
+exit $LASTEXITCODE
+```
+
+Aufgabe mit PowerShell registrieren:
+
+```powershell
+$action = New-ScheduledTaskAction `
+  -Execute 'C:\Program Files\PowerShell\7\pwsh.exe' `
+  -Argument '-NoLogo -NoProfile -NonInteractive -File "C:\CsvEncodingValidator\run-validator.ps1"'
+$trigger = New-ScheduledTaskTrigger -Once (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 30) -MultipleInstances IgnoreNew
+
+Register-ScheduledTask `
+  -TaskName 'CSV Encoding Validator' `
+  -Action $action `
+  -Trigger $trigger `
+  -Settings $settings `
+  -User 'CONTOSO\svc-csv-validator' `
+  -RunLevel Highest
+```
+
+Passe Dienstkonto, Trigger-Intervall und Pfade an die Umgebung an. Das Dienstkonto benötigt Leserechte für `app` und Änderungsrechte für `data` sowie `logs`; interaktive Benutzer sollten keinen Schreibzugriff auf das Skriptverzeichnis erhalten.
+
+### 5. Produktive Betriebsregeln
+
+- Eingabedateien erst nach vollständig abgeschlossenem Kopiervorgang in `data\input` ablegen.
+- `data\output`, `data\invalid` und `logs` regelmäßig sichern und bereinigen.
+- Exit-Code `1` über die Aufgabenplanung oder das Monitoring alarmieren.
+- Bei parallelen Lieferantenprozessen getrennte Input-/Output-Verzeichnisse oder ein abgestimmtes Locking verwenden.
+- Das Skript und PowerShell 7 kontrolliert aktualisieren und danach den Testlauf ausführen.
+- Nach einer Aktualisierung zuerst mit einer Kopie der produktiven Daten testen; der Validator überschreibt vorhandene Ausgabedateien nicht.
+
+## Verzeichnisse
+
+```text
+data/input    zu prüfende CSV-Dateien
+data/output   valide und konvertierte UTF-8-Dateien ohne BOM
+data/invalid  nicht sicher reparierbare CSV-Dateien
+docs/         Projektdokumentation und Screenshot
+src/          PowerShell-Produktionsskript
+tests/        reproduzierbare Tests
+```
+
+## Logging und Exit-Codes
+
+Das Skript protokolliert Start, Erkennung, Konvertierung, Sanity Check, Erfolg und Fehler auf Standard-Out. Der Container endet nach der Verarbeitung:
+
+| Code | Bedeutung |
+| ---: | --- |
+| `0` | Alle CSV-Dateien sind valide oder wurden erfolgreich konvertiert. |
+| `1` | Mindestens eine Datei konnte nicht sicher verarbeitet werden und liegt in `data/invalid`. |
+
+## Lokale Tests
+
+Die Testfälle werden bytegenau zur Laufzeit erzeugt; ein externes Testframework ist nicht erforderlich:
+
 ```bash
 docker run --rm -v "$PWD/in:/app/data/input" -v "$PWD/out:/app/data/output" -v "$PWD/bad:/app/data/invalid" \
   csv-encoding-validator:latest -Move
