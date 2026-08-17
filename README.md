@@ -21,6 +21,18 @@ wird konvertiert, eine defekte Datei nach `/invalid` quarantänisiert, die
 UTF-8-Datei bleibt unverändert und die BOM wird entfernt. Exit-Code 1, da eine
 Datei irreparabel war.*
 
+## Interaktives Diagramm
+
+Ein interaktives **Workflow-Diagramm** des Validators (Hauptpfad, BOM-Analyse,
+UTF-8-Prüfung, Windows-1252-Reparatur, Sanity-Check und Verteilung auf
+`output/`/`invalid/` inkl. Exit-Codes) liegt im Repository:
+
+> 📊 [`docs/workflow-csv-validator.html`](docs/workflow-csv-validator.html)
+
+Die Diagrammdatei ist ein eigenständiger, interaktiver Viewer (Theme-Umschaltung
+Hell/Dunkel, Pan/Zoom, Suche, Fokus und Export). Einfach im Browser öffnen —
+keine Installation nötig.
+
 ## Funktionsweise
 
 Pro Datei werden diese Schritte sequenziell durchgeführt:
@@ -64,6 +76,8 @@ Konvertierung gelöscht).
 │   ├── input/
 │   ├── output/
 │   └── invalid/
+├── docs/
+│   └── workflow-csv-validator.html   # interaktives Workflow-Diagramm
 ├── src/
 │   └── Test-AndFixCsvEncoding.ps1
 ├── img/

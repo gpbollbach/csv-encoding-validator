@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "CSV Encoding Validator & Converter",
+    "quality_profile": "showcase"
+  },
+  "lanes": [
+    { "id": "eingang", "label": "Eingang" },
+    { "id": "bom", "label": "BOM-Analyse" },
+    { "id": "validierung", "label": "UTF-8-Validierung" },
+    { "id": "reparatur", "label": "Reparaturpfad" },
+    { "id": "sanity", "label": "Sanity-Check" },
+    { "id": "ergebnis", "label": "Ergebnis & Exit" }
+  ],
+  "phases": [
+    { "id": "phase-eingang", "label": "Eingang", "fromCol": 0, "toCol": 1 },
+    { "id": "phase-pruefung", "label": "Prüfung & Reparatur", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "phase-verteilung", "label": "Verteilung & Exit", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["input", "bom", "utf8", "sanity", "output"],
+  "nodes": [
+    { "id": "input", "lane": "eingang", "col": 0, "type": "external", "label": "CSV-Datei", "sublabel": "Eingabeverzeichnis", "width": 94 },
+    { "id": "bom", "lane": "bom", "col": 1, "type": "backend", "label": "BOM-Analyse", "sublabel": "BOM erkennen", "width": 94 },
+    { "id": "utf8", "lane": "validierung", "col": 2, "type": "backend", "label": "UTF-8-Prüfung", "sublabel": "byteweise, strikt", "width": 100 },
+    { "id": "repair", "lane": "reparatur", "col": 2, "type": "backend", "label": "1252 → UTF-8", "sublabel": "UTF-8 ohne BOM neu", "width": 94 },
+    { "id": "sanity", "lane": "sanity", "col": 3, "type": "security", "label": "Sanity-Check", "sublabel": "U+FFFD · NUL · Mojibake", "width": 106 },
+    { "id": "output", "lane": "ergebnis", "col": 4, "type": "database", "label": "output/", "sublabel": "valide · UTF-8", "tag": "Exit 0", "width": 98 },
+    { "id": "invalid", "lane": "ergebnis", "col": 5, "type": "database", "label": "invalid/", "sublabel": "Quarantäne", "tag": "Exit 1", "width": 98 }
+  ],
+  "edges": [
+    { "id": "input-bom", "from": "input", "to": "bom", "variant": "default", "role": "main" },
+    { "id": "bom-utf8", "from": "bom", "to": "utf8", "variant": "default", "role": "main", "route": "drop", "fromSide": "right", "toSide": "left" },
+    { "id": "utf8-sanity", "from": "utf8", "to": "sanity", "variant": "default", "role": "main", "route": "drop", "fromSide": "right", "toSide": "left" },
+    { "id": "utf8-repair", "from": "utf8", "to": "repair", "label": "invalides UTF-8", "variant": "emphasis", "role": "branch", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "repair-sanity", "from": "repair", "to": "sanity", "label": "UTF-8 ohne BOM", "variant": "emphasis", "role": "branch", "route": "drop", "fromSide": "bottom", "toSide": "bottom", "labelSegment": 2 },
+    { "id": "sanity-output", "from": "sanity", "to": "output", "label": "in Ordnung", "variant": "default", "role": "main", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "sanity-invalid", "from": "sanity", "to": "invalid", "label": "korrupt", "variant": "security", "role": "error", "route": "drop", "fromSide": "bottom", "toSide": "top" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Prüfpipeline",
+      "items": [
+        "UTF-8-BOM (EF BB BF) wird erkannt und entfernt",
+        "Strikte byteweise UTF-8-Validierung (Fall A/B)",
+        "Windows-1252/ISO-8859-1 wird nach UTF-8 ohne BOM konvertiert",
+        "Sanity-Check: U+FFFD, NUL, Mojibake; UTF-16/32 → invalid"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Ergebnis & Exit-Codes",
+      "items": [
+        "output/: valide bzw. konvertierte Dateien → Exit 0",
+        "invalid/: irreparable Dateien (Quarantäne) → Exit 1",
+        "-Move entfernt verarbeitete Dateien aus dem Eingang"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Betrieb",
+      "items": [
+        "Docker: Volume-Mounts /app/data/input, output, invalid",
+        "Windows ohne Docker: PowerShell 7 + Aufgabenplanung",
+        "Logging pro Datei auf Standard-Out"
+      ]
+    }
+  ]
+}
