@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Encoding Validator &amp; Converter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⟲</span>
+      <div>
+        <h1>CSV Encoding Validator</h1>
+        <p class="sub">BOM-Analyse · UTF-8-Prüfung · Windows-1252 → UTF-8-Konvertierung — vollständig offline im Browser</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <!-- Drop-Zone -->
+    <section class="panel">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="CSV-Dateien hier ablegen oder hochladen">
+        <div class="dz-icon">⇩</div>
+        <p class="dz-title">CSV-Dateien hierher ziehen</p>
+        <p class="dz-hint">oder <label class="browse" for="fileInput">Dateien auswählen</label> — alles läuft lokal, nichts wird hochgeladen</p>
+        <input type="file" id="fileInput" multiple accept=".csv,text/csv" hidden>
+      </div>
+
+      <div class="summary" id="summary" hidden></div>
+    </section>
+
+    <!-- Ergebnisse -->
+    <section class="panel results-panel" id="results" hidden>
+      <h2>Ergebnisse</h2>
+      <div id="resultsList" class="results-list"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Erkennung identisch zum PowerShell-Validator — siehe <code>docs/workflow-csv-validator.html</code>.</p>
+  </footer>
+
+  <script src="validator.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

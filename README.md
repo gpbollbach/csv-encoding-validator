@@ -14,6 +14,28 @@ Folgesysteme führt das zu Zeichenabbruchfehlern bzw. korrupten deutschen
 Umlauten (ä, ö, ü, Ä, Ö, Ü, ß). Das Tool erkennt solche Dateien und konvertiert
 sie verlustfrei nach UTF-8.
 
+## 💻 Web-Variante (offline im Browser)
+
+Ohne Docker, PowerShell oder Installation — Dateien direkt im Browser prüfen:
+
+> 🌐 [`web/index.html`](web/index.html) — einfach im Browser öffnen (Doppelklick oder `file://`)
+
+- CSV-Dateien per **Drag & Drop** oder Dateiauswahl laden (mehrfach möglich).
+- Pro Datei sofortiges Ergebnis: **OK** (valides UTF-8 ohne BOM), **Konvertiert**
+  (BOM entfernt oder Windows-1252 → UTF-8) oder **Fehler** mit detaillierter
+  **Fehleranalyse** (U+FFFD, NUL-Bytes, Mojibake/Double-Encoding — jeweils mit
+  Kontext der Fundstellen).
+- Konvertierte Dateien lassen sich per Klick als **UTF-8 ohne BOM** herunterladen.
+- **100 % offline:** alle `validator.*`-Skripte laufen lokal im Browser, es wird
+  nichts hochgeladen.
+
+Die Erkennungslogik (`web/validator.js`) ist eine direkte Übertragung von
+`Test-AndFixCsvEncoding.ps1` und wird in Node gegen dieselben Fixtures getestet:
+
+```bash
+node web/validator.test.js        # 26 Checks gegen tests/testdata/
+```
+
 <img src="img/screenshot.png" alt="Screenshot: Container-Lauf mit Schritt-für-Schritt-Logging (BOM-Entfernung, Windows-1252-Konvertierung, Quarantäne der korrupten Datei)" width="900">
 
 *Beispiel-Lauf: `docker run` verarbeitet vier CSV-Dateien – eine Windows-1252-Datei
@@ -78,6 +100,12 @@ Konvertierung gelöscht).
 │   └── invalid/
 ├── docs/
 │   └── workflow-csv-validator.html   # interaktives Workflow-Diagramm
+├── web/                         # Offline-Web-Variante (Browser)
+│   ├── index.html
+│   ├── style.css
+│   ├── app.js
+│   ├── validator.js             # Erkennungslogik (aus dem PowerShell-Skript)
+│   └── validator.test.js        # Node-Test gegen tests/testdata/
 ├── src/
 │   └── Test-AndFixCsvEncoding.ps1
 ├── img/
